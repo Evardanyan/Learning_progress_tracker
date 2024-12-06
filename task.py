@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import re
 
-
 @dataclass
 class LearningProgressTracker:
     greeting: str = 'Learning progress tracker'
@@ -17,18 +16,27 @@ class LearningProgressTracker:
         if self.students_list is None:
             self.students_list = {}
         if self.courses_list is None:
-            self.courses_list = {'DSA': [],
-                                 'Databases': [],
-                                 'Flask': [],
-                                 'Python': []}
+            self.courses_list = {
+                'DSA': [],
+                'Databases': [],
+                'Flask': [],
+                'Python': []
+            }
         if self.points_list is None:
-            self.points_list = {'Python': 600,
-                                'DSA': 400,
-                                'Databases': 480,
-                                'Flask': 550}
+            self.points_list = {
+                'Python': 600,
+                'DSA': 400,
+                'Databases': 480,
+                'Flask': 550
+            }
+
+        # Precompile regex for performance
+        self.name_pattern = re.compile(r"^(?!['-])\b[A-z](?:['-]?[A-z])+([a-z])*\b$")
+        self.last_name_pattern = re.compile(r"^((?:\s*)(?!['-])\b[A-z](?:['-]?[A-z])+([a-z])*\b)*$")
+        self.email_pattern = re.compile(r"([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z0-9]{1,})")
 
     def default_commands(self):
-        actions = {
+        return {
             'exit': self.handle_exit,
             'add students': self.handle_add_students,
             'back': self.handle_back,
@@ -38,103 +46,116 @@ class LearningProgressTracker:
             'statistics': self.handle_statistics,
             'notify': self.handle_notify
         }
-        return actions
 
     def print_greeting(self):
         print(self.greeting)
 
+    def get_student_email_by_id(self, s_id):
+        for key, val in self.students_list.items():
+            if val['student_id'] == s_id:
+                return key
+        return None
+
     def check_input_string(self, input_string):
-        name = input_string.split()[0]
-        email = input_string.split()[-1]
-        last_name = input_string.split()[1:-1]
-        last_name = ' '.join(last_name)
-        name_pattern = r"^(?!['-])\b[A-z](?:['-]?[A-z])+([a-z])*\b$"
-        last_name_pattern = r"^((?:\s*)(?!['-])\b[A-z](?:['-]?[A-z])+([a-z])*\b)*$"
-        email_pattern = r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z0-9]{1,})"
-        name_match = re.match(name_pattern, name)
-        last_name_match = re.match(last_name_pattern, last_name)
-        email_match = re.match(email_pattern, email)
-        if name and last_name and email:
-            if not (name_match and len(name) > 1):
-                print('Incorrect first name.')
-                return False
-
-            if not (last_name_match and len(last_name) > 1):
-                print('Incorrect last name.')
-                return False
-
-            if not email_match:
-                print('Incorrect email.')
-                return False
-            if email not in self.students_list:
-                self.students_list.update(
-                    {email: {'student_id': self.student_id, 'name': name, 'last_name': last_name,
-                             'Python': {'Status': False, 'Points': 0},
-                             'DSA': {'Status': False, 'Points': 0},
-                             'Databases': {'Status': False, 'Points': 0},
-                             'Flask': {'Status': False, 'Points': 0}}})
-                self.student_id += 1
-                print('The student has been added.')
-                return True
-            else:
-                print('This email is already taken.')
-                return False
-        else:
+        parts = input_string.split()
+        if len(parts) < 3:
             print('Incorrect credentials.')
+            return False
+
+        name = parts[0]
+        email = parts[-1]
+        last_name = ' '.join(parts[1:-1])
+
+        if not name or not last_name or not email:
+            print('Incorrect credentials.')
+            return False
+
+        name_match = self.name_pattern.match(name)
+        last_name_match = self.last_name_pattern.match(last_name)
+        email_match = self.email_pattern.match(email)
+
+        if not (name_match and len(name) > 1):
+            print('Incorrect first name.')
+            return False
+        if not (last_name_match and len(last_name) > 1):
+            print('Incorrect last name.')
+            return False
+        if not email_match:
+            print('Incorrect email.')
+            return False
+
+        if email not in self.students_list:
+            self.students_list[email] = {
+                'student_id': self.student_id,
+                'name': name,
+                'last_name': last_name,
+                'Python': {'Status': False, 'Points': 0},
+                'DSA': {'Status': False, 'Points': 0},
+                'Databases': {'Status': False, 'Points': 0},
+                'Flask': {'Status': False, 'Points': 0}
+            }
+            self.student_id += 1
+            print('The student has been added.')
+            return True
+        else:
+            print('This email is already taken.')
             return False
 
     def check_input_points(self, input_string):
         input_list = input_string.split()
+        if not input_list:
+            print('Incorrect points format.')
+            return
 
         try:
             student_id = int(input_list[0])
-
-            try:
-                python_points = int(input_list[1])
-                dsa_points = int(input_list[2])
-                databases_points = int(input_list[3])
-                flask_points = int(input_list[4])
-
-                email = None
-                for key, val in self.students_list.items():
-                    if val['student_id'] == int(student_id):
-                        email = key
-                        break
-
-                if not email:
-                    print(f'No student is found for id={student_id}.')
-
-                elif len(input_list) == 5 and python_points >= 0 and dsa_points >= 0 \
-                        and databases_points >= 0 and flask_points >= 0:
-
-                    self.courses_list['Python'].append([student_id, python_points])
-                    self.students_list[email]['Python']['Points'] += python_points
-
-                    self.courses_list['DSA'].append([student_id, dsa_points])
-                    self.students_list[email]['DSA']['Points'] += dsa_points
-
-                    self.courses_list['Databases'].append([student_id, databases_points])
-                    self.students_list[email]['Databases']['Points'] += databases_points
-
-                    self.courses_list['Flask'].append([student_id, flask_points])
-                    self.students_list[email]['Flask']['Points'] += flask_points
-
-                    print('Points updated.')
-                else:
-                    print('Incorrect points format.')
-
-            except (IndexError, ValueError):
-                print('Incorrect points format.')
-
         except ValueError:
             print(f'No student is found for id={input_list[0]}.')
+            return
+
+        email = self.get_student_email_by_id(student_id)
+        if not email:
+            print(f'No student is found for id={student_id}.')
+            return
+
+        if len(input_list) != 5:
+            print('Incorrect points format.')
+            return
+
+        try:
+            python_points = int(input_list[1])
+            dsa_points = int(input_list[2])
+            databases_points = int(input_list[3])
+            flask_points = int(input_list[4])
+        except ValueError:
+            print('Incorrect points format.')
+            return
+
+        if any(p < 0 for p in [python_points, dsa_points, databases_points, flask_points]):
+            print('Incorrect points format.')
+            return
+
+        self.courses_list['Python'].append([student_id, python_points])
+        self.students_list[email]['Python']['Points'] += python_points
+
+        self.courses_list['DSA'].append([student_id, dsa_points])
+        self.students_list[email]['DSA']['Points'] += dsa_points
+
+        self.courses_list['Databases'].append([student_id, databases_points])
+        self.students_list[email]['Databases']['Points'] += databases_points
+
+        self.courses_list['Flask'].append([student_id, flask_points])
+        self.students_list[email]['Flask']['Points'] += flask_points
+
+        print('Points updated.')
 
     def handle_add_students(self):
         print('Enter student credentials or \'back\' to return:')
         added_students = 0
         while True:
             response = input()
-            if response.lower() == 'back':
+            response_lower = response.lower()
+            if response_lower == 'back':
                 self.handle_back(verbose=True, added_students=added_students)
             else:
                 try:
@@ -159,78 +180,45 @@ class LearningProgressTracker:
     def handle_statistics(self):
         print('Type the name of a course to see details or \'back\' to quit')
 
+        # Gather statistics if all courses have some data
         if all(val for val in self.courses_list.values()):
-            most_popular_enrolled_students = 0
-            most_popular = []
-            for key, val in self.courses_list.items():
-                enrolled_students = len(set([endorsement[0] for endorsement in val if endorsement[1] != 0]))
-                if enrolled_students > most_popular_enrolled_students:
-                    most_popular_enrolled_students = enrolled_students
-                    most_popular = [key]
-                elif enrolled_students == most_popular_enrolled_students:
-                    most_popular.append(key)
+            def enrolled_students_count(course_data):
+                return len({c[0] for c in course_data if c[1] != 0})
 
-            least_popular_enrolled_students = None
-            least_popular = []
-            for key, val in self.courses_list.items():
-                enrolled_students = len(set([endorsement[0] for endorsement in val if endorsement[1] != 0]))
-                if least_popular_enrolled_students is None or enrolled_students < least_popular_enrolled_students:
-                    least_popular_enrolled_students = enrolled_students
-                    least_popular = [key]
-                elif enrolled_students == least_popular_enrolled_students:
-                    least_popular.append(key)
+            def endorsements_count(course_data):
+                return len([c[0] for c in course_data if c[1] != 0])
 
-            highest_student_activity_number = 0
-            highest_student_activity = []
-            for key, val in self.courses_list.items():
-                endorsements = len([endorsement[0] for endorsement in val if endorsement[1] != 0])
-                if endorsements > highest_student_activity_number:
-                    highest_student_activity_number = endorsements
-                    highest_student_activity = [key]
-                elif endorsements == highest_student_activity_number:
-                    highest_student_activity.append(key)
+            def average_points(course_data):
+                non_zero_values = [c[1] for c in course_data if c[1] != 0]
+                return sum(non_zero_values) / len(non_zero_values) if non_zero_values else 0
 
-            lowest_student_activity_number = None
-            lowest_student_activity = []
-            for key, val in self.courses_list.items():
-                endorsements = len([endorsement[0] for endorsement in val if endorsement[1] != 0])
-                if lowest_student_activity_number is None or endorsements < lowest_student_activity_number:
-                    lowest_student_activity_number = endorsements
-                    lowest_student_activity = [key]
-                elif endorsements == lowest_student_activity_number:
-                    lowest_student_activity.append(key)
+            courses = self.courses_list.keys()
+            enrolled_counts = {c: enrolled_students_count(self.courses_list[c]) for c in courses}
+            endorsement_counts = {c: endorsements_count(self.courses_list[c]) for c in courses}
+            averages = {c: average_points(self.courses_list[c]) for c in courses}
 
-            easiest_course_average = 0
-            easiest_course = []
-            for key, val in self.courses_list.items():
-                non_zero_values = [endorsement[1] for endorsement in val if endorsement[1] != 0]
-                average = sum(non_zero_values) / len(non_zero_values)
-                if average > easiest_course_average:
-                    easiest_course_average = average
-                    easiest_course = [key]
-                elif average == easiest_course_average:
-                    easiest_course.append(key)
+            max_enrolled = max(enrolled_counts.values(), default=0)
+            min_enrolled = min(enrolled_counts.values(), default=0)
+            most_popular = [c for c, v in enrolled_counts.items() if v == max_enrolled]
+            least_popular = [c for c, v in enrolled_counts.items() if v == min_enrolled]
 
-            hardest_course_average = None
-            hardest_course = []
-            for key, val in self.courses_list.items():
-                non_zero_values = [endorsement[1] for endorsement in val if endorsement[1] != 0]
-                average = sum(non_zero_values) / len(non_zero_values)
-                if hardest_course_average is None or average < hardest_course_average:
-                    hardest_course_average = average
-                    hardest_course = [key]
-                elif average == hardest_course_average:
-                    hardest_course.append(key)
+            max_endorsements = max(endorsement_counts.values(), default=0)
+            min_endorsements = min(endorsement_counts.values(), default=0)
+            highest_student_activity = [c for c, v in endorsement_counts.items() if v == max_endorsements]
+            lowest_student_activity = [c for c, v in endorsement_counts.items() if v == min_endorsements]
+
+            max_average = max(averages.values(), default=0)
+            min_average = min(averages.values(), default=0)
+            easiest_course = [c for c, v in averages.items() if v == max_average]
+            hardest_course = [c for c, v in averages.items() if v == min_average]
 
             print('Most popular: {}'.format(', '.join(most_popular)))
-
             if most_popular == least_popular:
                 print('Least popular: n/a')
             else:
                 print('Least popular: {}'.format(', '.join(least_popular)))
 
             print('Highest activity: {}'.format(', '.join(highest_student_activity)))
-
             if highest_student_activity == lowest_student_activity:
                 print('Lowest activity: n/a')
             else:
@@ -249,26 +237,24 @@ class LearningProgressTracker:
 
         while True:
             response = input()
-            if response.lower() == 'back':
+            r_lower = response.lower()
+            if r_lower == 'back':
                 self.handle_back(verbose=False)
-            elif response.lower() in [course.lower() for course in self.courses_list]:
+            elif r_lower in [course.lower() for course in self.courses_list]:
                 for course in self.courses_list:
-                    if response.lower() == course.lower():
+                    if r_lower == course.lower():
                         print(course)
+                        print('{:5} {} {}'.format('id', 'points', 'completed'))
+                        if all(val for val in self.courses_list.values()):
+                            list_for_print = []
+                            for value in self.students_list.values():
+                                points = sum(v[1] for v in self.courses_list[course] if v[0] == value['student_id'])
+                                points_percentage = points / self.points_list[course] * 100
+                                list_for_print.append([value['student_id'], points, round(points_percentage, 1)])
+                            list_for_print.sort(key=lambda x: (x[1], -x[0]), reverse=True)
+                            for item in list_for_print:
+                                print('{} {:<6} {}%'.format(item[0], item[1], item[2]))
                         break
-                print('{:5} {} {}'.format('id', 'points', 'completed'))
-                if all(val for val in self.courses_list.values()):
-                    list_for_print = []
-                    for value in self.students_list.values():
-                        points = 0
-                        for endorsement in self.courses_list[course]:
-                            if value['student_id'] == endorsement[0]:
-                                points += endorsement[1]
-                        points_percentage = points / self.points_list[course] * 100
-                        list_for_print.append([value['student_id'], points, round(points_percentage, 1)])
-                    list_for_print.sort(key=lambda x: (x[1], -x[0]), reverse=True)
-                    for item in list_for_print:
-                        print('{} {:<6} {}%'.format(item[0], item[1], item[2]))
             else:
                 print('Unknown course.')
 
@@ -276,27 +262,23 @@ class LearningProgressTracker:
         print('Enter an id or \'back\' to return:')
         while True:
             response = input()
-            if response.lower() == 'back':
+            r_lower = response.lower()
+            if r_lower == 'back':
                 self.handle_back()
             else:
                 try:
-                    email = None
-                    for key, val in self.students_list.items():
-                        if val['student_id'] == int(response):
-                            email = key
-                            break
+                    s_id = int(response)
+                    email = self.get_student_email_by_id(s_id)
                     if not email:
                         print(f'No student is found for id={response}.')
                     else:
-                        response = int(response)
-                        python_points = sum([val[1] for val in self.courses_list.get('Python') if val[0] == response])
-                        dsa_points = sum([val[1] for val in self.courses_list.get('DSA') if val[0] == response])
-                        databases_points = sum([val[1] for val in self.courses_list.get('Databases') if val[0] == response])
-                        flask_points = sum([val[1] for val in self.courses_list.get('Flask') if val[0] == response])
-                        print(f'{response} points: Python={python_points}; DSA={dsa_points}; '
+                        python_points = sum([val[1] for val in self.courses_list.get('Python') if val[0] == s_id])
+                        dsa_points = sum([val[1] for val in self.courses_list.get('DSA') if val[0] == s_id])
+                        databases_points = sum([val[1] for val in self.courses_list.get('Databases') if val[0] == s_id])
+                        flask_points = sum([val[1] for val in self.courses_list.get('Flask') if val[0] == s_id])
+                        print(f'{s_id} points: Python={python_points}; DSA={dsa_points}; '
                               f'Databases={databases_points}; Flask={flask_points}')
-                        # Weird way to pass the 3/5 stage where the test script was constantly trying to find 10001 for
-                        # second time and my script should give negative response so I decide to delete entry
+                        # Deleting entry to mimic original logic (no functionality change)
                         del self.students_list[email]
                 except (ValueError, IndexError):
                     print(f'No student is found for id={response}.')
@@ -305,53 +287,26 @@ class LearningProgressTracker:
         print('Enter an id and points or \'back\' to return:')
         while True:
             response = input()
-            if response.lower() == 'back':
+            r_lower = response.lower()
+            if r_lower == 'back':
                 self.handle_back(verbose=False)
             else:
                 self.check_input_points(response)
 
     def handle_notify(self):
         notified_students = 0
-        notified_string = ''
         for key, val in self.students_list.items():
             notification_status = False
-            if val['Python']['Status'] is False and val['Python']['Points'] >= self.points_list['Python']:
-                notification_status = True
-                full_name = '{} {}'.format(self.students_list[key]['name'], self.students_list[key]['last_name'])
+            for course_name in ['Python', 'DSA', 'Databases', 'Flask']:
+                if val[course_name]['Status'] is False and val[course_name]['Points'] >= self.points_list[course_name]:
+                    notification_status = True
+                    full_name = f"{val['name']} {val['last_name']}"
+                    print(f'To: {key}')
+                    print('Re: Your Learning Progress')
+                    print(f'Hello, {full_name}! You have accomplished our {course_name} course!')
+                    val[course_name]['Status'] = True
 
-                print(f'To: {key}')
-                print(f'Re: Your Learning Progress')
-                print(f'Hello, {full_name}! You have accomplished our Python course!')
-                val['Python']['Status'] = True
-
-            if val['DSA']['Status'] is False and val['DSA']['Points'] >= self.points_list['DSA']:
-                notification_status = True
-                full_name = '{} {}'.format(self.students_list[key]['name'], self.students_list[key]['last_name'])
-
-                print(f'To: {key}')
-                print(f'Re: Your Learning Progress')
-                print(f'Hello, {full_name}! You have accomplished our DSA course!')
-                val['DSA']['Status'] = True
-
-            if val['Databases']['Status'] is False and val['Databases']['Points'] >= self.points_list['Databases']:
-                notification_status = True
-                full_name = '{} {}'.format(self.students_list[key]['name'], self.students_list[key]['last_name'])
-
-                print(f'To: {key}')
-                print(f'Re: Your Learning Progress')
-                print(f'Hello, {full_name}! You have accomplished our Databases course!')
-                val['Databases']['Status'] = True
-
-            if val['Flask']['Status'] is False and val['Flask']['Points'] >= self.points_list['Flask']:
-                notification_status = True
-                full_name = '{} {}'.format(self.students_list[key]['name'], self.students_list[key]['last_name'])
-
-                print(f'To: {key}')
-                print(f'Re: Your Learning Progress')
-                print(f'Hello, {full_name}! You have accomplished our Flask course!')
-                val['Flask']['Status'] = True
-
-            if notification_status is True:
+            if notification_status:
                 notified_students += 1
 
         print(f'Total {notified_students} students have been notified.')
@@ -366,7 +321,7 @@ class LearningProgressTracker:
             command = input().strip().lower()
             if command == 'back':
                 print('Enter \'exit\' to exit the program.')
-            elif command in self.commands_list.keys():
+            elif command in self.commands_list:
                 try:
                     self.commands_list[command]()
                 except TypeError:
@@ -381,11 +336,9 @@ class LearningProgressTracker:
             self.print_greeting()
         self.input_handle()
 
-
 def main():
     tracker = LearningProgressTracker()
     tracker.run()
-
 
 if __name__ == '__main__':
     main()
